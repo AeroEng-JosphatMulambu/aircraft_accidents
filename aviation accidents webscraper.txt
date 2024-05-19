@@ -1,0 +1,135 @@
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup as Bs
+import re
+
+# urls for page navigation
+
+base_url = 'https://www.planecrashinfo.com'
+base_url1 = 'https://www.planecrashinfo.com'
+
+# function to extract all the accidents urls from 1970 to 2024 January 23rd
+
+def get_urls1():
+    page_text = requests.get('https://www.planecrashinfo.com/database.htm').text
+    soup = Bs(page_text, 'lxml')
+    table_tag = soup.find_all('table')
+    table_of_interest = table_tag[1]
+    tr_tags = table_of_interest.find_all('tr')
+    hrefs = []
+    for i, tr in enumerate(tr_tags):
+        if i >= 5:
+            td_tags = tr.find_all('td')
+            for td_tag in td_tags:
+                a_tag = td_tag.a
+                if a_tag is not None:
+                    href = a_tag.get('href')
+                    hrefs.append(base_url + href)
+    return hrefs
+
+# collection of all the urls
+
+urls = get_urls1()
+
+# function to extract all the accident urls for each year from 1970 to 2024 January
+
+def get_urls2(urls1):
+    hrefs1 = []
+    for url1 in urls1:
+        page_text1 = requests.get(url1).text
+        soup1 = Bs(page_text1, 'lxml')
+        table_tag1 = soup1.find('table')
+        tr_tags1 = table_tag1.find_all('tr')
+        body_tag = soup1.find('body').p.text
+        url_part = '/' + body_tag + '/'
+        for index, tr1 in enumerate(tr_tags1):
+            if index >= 1:
+                td_tags1 = tr1.find_all('td')
+                for td_tag1 in td_tags1:
+                    a_tag1 = td_tag1.a
+                    if a_tag1 is not None:
+                        href1 = a_tag1.get('href')
+                        hrefs1.append(base_url1 + url_part + href1)
+    return hrefs1
+
+# code to extract all the necessary accident information, put in a dataframe for conversation to csv file
+
+try:
+    urls2 = get_urls2(urls)
+    aircraft_incidences = []
+    for url in urls2:
+        page_text2 = requests.get(url).text
+        soup2 = Bs(page_text2, 'lxml')
+        table_tag2 = soup2.find('table')
+        tr_tags2 = table_tag2.find_all('tr')
+        ind_aircraft_incidence = {}
+        for index1, tr2 in enumerate(tr_tags2):
+            if index1 == 0:
+                continue
+            elif index1 == 1:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['date'] = td_tags2[1].text
+            elif index1 == 2:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['time'] = td_tags2[1].text
+            elif index1 == 3:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['location'] = td_tags2[1].text
+            elif index1 == 4:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['operator'] = td_tags2[1].text
+            elif index1 == 5:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['flight no'] = td_tags2[1].text
+            elif index1 == 6:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['route'] = td_tags2[1].text
+            elif index1 == 7:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['AC type'] = td_tags2[1].text
+            elif index1 == 8:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['registration'] = td_tags2[1].text
+            elif index1 == 9:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['cn/ln'] = td_tags2[1].text
+            elif index1 == 10:
+                td_tags2 = tr2.find_all('td')
+                numbers = re.findall(r'\d+', td_tags2[1].text)
+                if len(numbers) == 3:
+                    aboard = int(numbers[0])  # Total count
+                    passengers_aboard = int(numbers[1])  # Number of passengers
+                    crew_aboard = int(numbers[2])
+                    ind_aircraft_incidence['aboard'] = aboard
+                    ind_aircraft_incidence['passengers_on_aboard'] = passengers_aboard
+                    ind_aircraft_incidence['crew_on_aboard'] = crew_aboard
+                if len(numbers) == 1:
+                    aboard = int(numbers[0])
+                    ind_aircraft_incidence['aboard'] = aboard
+            elif index1 == 11:
+                td_tags2 = tr2.find_all('td')
+                numbers = re.findall(r'\d+', td_tags2[1].text)
+                if len(numbers) == 3:
+                    fatalities = int(numbers[0])  # Total count
+                    passengers_fatality = int(numbers[1])  # Number of passengers
+                    crew_fatality = int(numbers[2])
+                    ind_aircraft_incidence['fatality'] = fatalities
+                    ind_aircraft_incidence['passengers_fatality'] = passengers_fatality
+                    ind_aircraft_incidence['crew_fatality'] = crew_fatality
+                if len(numbers) == 1:
+                    fatalities = int(numbers[0])
+                    ind_aircraft_incidence['fatality'] = fatalities
+            elif index1 == 12:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['ground_fatality'] = td_tags2[1].text
+            elif index1 == 13:
+                td_tags2 = tr2.find_all('td')
+                ind_aircraft_incidence['summary'] = td_tags2[1].text
+        aircraft_incidences.append(ind_aircraft_incidence)
+        # url_count += 1
+    df = pd.DataFrame(aircraft_incidences)
+    #df.to_csv('D:\DATA ANALYTICS\EDA PROJECTS\AVIATION/aviation accidents.csv', index=False)
+    print(len(aircraft_incidences))
+
+except Exception as e:
+    print(f'error on: {url}\n error type: {type(e).__name__}')
